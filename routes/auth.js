@@ -23,10 +23,39 @@ async function checkConnection() {
 
 checkConnection();
 
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, 'uploads/'); // Specify the directory to save files
+    },
+    filename: (req, file, cb) => {
+        const ext = path.extname(file.originalname);
+        const filename = `${Date.now()}${ext}`;
+        cb(null, filename); // Specify the filename to save
+    },
+});
+
+const upload = multer({ storage });
+
+router.post('/upload', upload.single('foto'), (req, res) => {
+    try {
+        const { id_user } = req.body;
+        const fotoUrl = req.file ? req.file.filename : null;
+
+        const query = 'INSERT INTO data (id_user,foto) VALUES (?,?)'
+        if (!fotoUrl) {
+            return res.status(400).json({ message: 'No file uploaded' });
+        }
+        res.status(201).json({ fotoUrl });
+        db.query(query, [id_user, fotoUrl]);
+    } catch (error) {
+        console.error('Error during file upload:', error.message);
+        res.status(500).json({ error: 'An error occurred during file upload' });
+    }
+});
+
 router.post('/login', async (req, res) => {
     try {
         const { email, password } = req.body;
-
         const [rows] = await db.query('SELECT * FROM users WHERE email = ?', [email]);
 
         if (rows.length === 0) {
@@ -34,7 +63,6 @@ router.post('/login', async (req, res) => {
         }
 
         const user = rows[0];
-
         const isMatch = await bcrypt.compare(password, user.password);
 
         if (!isMatch) {
@@ -42,7 +70,6 @@ router.post('/login', async (req, res) => {
         }
 
         res.status(201).json(user);
-
     } catch (error) {
         console.error('Error during login:', error.message);
         res.status(500).json({ error: 'An error occurred during login' });
